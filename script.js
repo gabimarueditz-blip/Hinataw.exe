@@ -587,19 +587,22 @@ function setupMangaModal(item) {
 function loadVideoStream(url) {
   if (!url) return;
 
+  // If the URL is relative (starts with '/' but not '//'), prepend the API base.
+  if (url.startsWith('/') && !url.startsWith('//')) {
+    url = `${API_BASE}${url}`;
+  }
+
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
   }
 
-  if (url.includes(".m3u8")) {
+  if (url.includes('.m3u8')) {
     if (Hls.isSupported()) {
       hlsInstance = new Hls({ enableWorker: true });
       hlsInstance.loadSource(url);
       hlsInstance.attachMedia(videoPlayer);
-      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-        videoPlayer.play().catch(() => {});
-      });
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { videoPlayer.play().catch(() => {}); });
       hlsInstance.on(Hls.Events.ERROR, (event, data) => {
         if (data.fatal) {
           console.warn("HLS fatal error:", data.type);
