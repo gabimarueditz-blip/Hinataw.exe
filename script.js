@@ -3,7 +3,7 @@
  * Connected to Render Backend Services: https://hinataw-cloudflare.onrender.com
  */
 
-const API_BASE = "https://hinataw-cloudflare.onrender.com";
+const API_BASE = "https://hinataw-cloudflare.onrender.com"; // trigger redeploy
 
 // State
 let currentTab = "home";
