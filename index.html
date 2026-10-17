@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hinataw.exe — Movies, Series, Anime & Manga</title>
+  <meta name="description" content="Stream and discover Movies, Series, Anime and Manga powered by Render API services." />
+  <link rel="stylesheet" href="style.css" />
+  <!-- HLS.js for direct M3U8 video stream playback -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand" id="brandHome" role="button" tabindex="0">
+        <span class="brand-logo">⚡</span>
+        <div class="brand-text">
+          <span class="brand-name">hinataw<span class="accent">.exe</span></span>
+          <span class="brand-tag">Entertainment Hub</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <button class="nav-btn active" data-tab="home">Home</button>
+        <button class="nav-btn" data-tab="movies">Movies</button>
+        <button class="nav-btn" data-tab="series">TV Series</button>
+        <button class="nav-btn" data-tab="anime">Anime</button>
+        <button class="nav-btn" data-tab="manga">Manga</button>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="backend-badge" title="Render API Connected">
+          <span class="status-dot"></span>
+          <span class="status-label">Render API Live</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Search Bar Hero -->
+  <section class="search-section">
+    <div class="search-container">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="query" 
+          placeholder="Search movies, tv series, anime, or manga..." 
+          autocomplete="off"
+        />
+        <button id="clearSearchBtn" class="clear-btn" style="display: none;">✕</button>
+        <button id="searchBtn" class="search-submit-btn">Search</button>
+      </div>
+      <div class="search-filter-pills" id="searchFilters">
+        <button class="filter-pill active" data-type="all">All</button>
+        <button class="filter-pill" data-type="moviebox">Movies & Series</button>
+        <button class="filter-pill" data-type="anime">Anime</button>
+        <button class="filter-pill" data-type="manga">Manga</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Search Results Area -->
+  <section id="searchResultsSection" class="results-section" style="display: none;">
+    <div class="section-header">
+      <h2 id="searchResultsTitle">Search Results</h2>
+      <button id="closeSearchBtn" class="close-search-btn">Back to Home</button>
+    </div>
+    <div id="searchResultsGrid" class="cards-grid"></div>
+  </section>
+
+  <!-- Main Content Showcase -->
+  <main id="mainContent">
+    <!-- Hero Spotlight Banner -->
+    <section id="spotlightSection" class="spotlight-section">
+      <div class="spotlight-card" id="spotlightCard">
+        <div class="spotlight-backdrop" id="spotlightBackdrop"></div>
+        <div class="spotlight-overlay"></div>
+        <div class="spotlight-content">
+          <div class="spotlight-badge" id="spotlightBadge">FEATURED SPOTLIGHT</div>
+          <h1 class="spotlight-title" id="spotlightTitle">Loading Featured Titles...</h1>
+          <p class="spotlight-desc" id="spotlightDesc">Fetching spotlight anime and top movies from Render services.</p>
+          <div class="spotlight-meta" id="spotlightMeta"></div>
+          <div class="spotlight-actions">
+            <button class="btn-primary" id="spotlightPlayBtn">▶ Watch Now</button>
+            <button class="btn-secondary" id="spotlightDetailsBtn">ℹ View Info</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Popular Movies Row (MovieBox API) -->
+    <section class="media-section" id="moviesSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">🎬</span>
+          <h2>Popular Movies</h2>
+          <span class="source-tag">MovieBox API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="moviesRow">
+        <div class="loading-spinner">Loading movies from Render...</div>
+      </div>
+    </section>
+
+    <!-- Popular TV Series Row (MovieBox API) -->
+    <section class="media-section" id="seriesSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">📺</span>
+          <h2>Trending TV Series</h2>
+          <span class="source-tag">MovieBox API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="seriesRow">
+        <div class="loading-spinner">Loading series from Render...</div>
+      </div>
+    </section>
+
+    <!-- Trending Anime Row (Render API) -->
+    <section class="media-section" id="animeTrendingSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">🔥</span>
+          <h2>Trending Anime</h2>
+          <span class="source-tag">Anime API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="animeTrendingRow">
+        <div class="loading-spinner">Loading trending anime...</div>
+      </div>
+    </section>
+
+    <!-- Latest Anime Episodes Row (Render API) -->
+    <section class="media-section" id="animeLatestSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">⚡</span>
+          <h2>Latest Released Episodes</h2>
+          <span class="source-tag">Anime Stream API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="animeLatestRow">
+        <div class="loading-spinner">Loading latest episodes...</div>
+      </div>
+    </section>
+
+    <!-- Top Rated Anime Row (Render API) -->
+    <section class="media-section" id="animeTopRatedSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">⭐</span>
+          <h2>Top Rated Anime</h2>
+          <span class="source-tag">AniList API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="animeTopRatedRow">
+        <div class="loading-spinner">Loading top rated anime...</div>
+      </div>
+    </section>
+
+    <!-- Popular Manga Row (Manga API) -->
+    <section class="media-section" id="mangaSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">📖</span>
+          <h2>Popular Manga</h2>
+          <span class="source-tag">MangaDex API</span>
+        </div>
+      </div>
+      <div class="cards-row" id="mangaRow">
+        <div class="loading-spinner">Loading popular manga...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Interactive Media Modal & Video Player -->
+  <div id="mediaModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <button class="modal-close-btn" id="modalCloseBtn">✕</button>
+      
+      <div class="modal-player-container" id="modalPlayerContainer" style="display: none;">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="stream-source-selector" id="streamSources"></div>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-poster-wrap">
+          <img id="modalPoster" src="" alt="Poster" />
+        </div>
+        <div class="modal-info">
+          <div class="modal-badges" id="modalBadges"></div>
+          <h2 id="modalTitle">Title</h2>
+          <p class="modal-sub" id="modalSubtitle"></p>
+          <div class="modal-tags" id="modalTags"></div>
+          <p class="modal-overview" id="modalOverview"></p>
+          
+          <!-- Anime Episode Selector -->
+          <div class="episodes-container" id="episodesContainer" style="display: none;">
+            <div class="episodes-header">
+              <h3>Episodes</h3>
+              <div class="audio-switch" id="audioSwitch">
+                <button class="audio-btn active" data-audio="sub">Sub</button>
+                <button class="audio-btn" data-audio="dub">Dub</button>
+              </div>
+            </div>
+            <div class="episodes-grid" id="episodesGrid"></div>
+          </div>
+
+          <div class="modal-actions" id="modalActions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <p>hinataw.exe • Connected to Render Backend Services (<a href="https://hinataw-cloudflare.onrender.com" target="_blank" rel="noopener">hinataw-cloudflare.onrender.com</a>)</p>
+      <p class="footer-sub">All streaming endpoints and media catalogues are powered by Render API.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
