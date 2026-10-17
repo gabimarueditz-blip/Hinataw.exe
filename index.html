@@ -3,6 +3,41 @@
 <html lang="en">
 
 <head>
+  <!-- Render API Backend Integration -->
+  <script>
+    window.API_BASE = "https://hinataw-cloudflare.onrender.com";
+    (function() {
+      const _origFetch = window.fetch;
+      window.fetch = function(resource, init) {
+        if (typeof resource === 'string') {
+          if (resource.startsWith('/api/') || resource.startsWith('/home') || resource.startsWith('/watch/') || resource.startsWith('/stream/')) {
+            resource = window.API_BASE + resource;
+          }
+        } else if (resource && typeof resource.url === 'string') {
+          const u = resource.url;
+          if (u.startsWith('/api/') || u.startsWith('/home') || u.startsWith('/watch/') || u.startsWith('/stream/')) {
+            resource = new Request(window.API_BASE + u, resource);
+          } else if (u.startsWith(window.location.origin + '/')) {
+            const rel = u.slice(window.location.origin.length);
+            if (rel.startsWith('/api/') || rel.startsWith('/home') || rel.startsWith('/watch/') || rel.startsWith('/stream/')) {
+              resource = new Request(window.API_BASE + rel, resource);
+            }
+          }
+        }
+        return _origFetch.call(this, resource, init);
+      };
+
+      // Intercept XMLHttpRequest
+      const _origOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        if (typeof url === 'string' && (url.startsWith('/api/') || url.startsWith('/home') || url.startsWith('/watch/') || url.startsWith('/stream/'))) {
+          url = window.API_BASE + url;
+        }
+        return _origOpen.call(this, method, url, ...rest);
+      };
+    })();
+  </script>
+
 
   <!--
 
