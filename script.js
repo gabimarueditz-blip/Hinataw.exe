@@ -13,6 +13,7 @@ let currentModalItem = null;
 let currentAudioMode = "sub";
 let episodesData = null;
 let hlsInstance = null;
+let videoFrame = null;
 
 // DOM Elements
 const brandHome = document.getElementById("brandHome");
@@ -540,38 +541,118 @@ async function playAnimeEpisode(animeId, epNumber, audio) {
     sBtn.addEventListener("click", () => {
       document.querySelectorAll(".source-btn").forEach(b => b.classList.remove("active"));
       sBtn.classList.add("active");
-      loadVideoStream(s.url);
+      loadVideoStream(s.url || s.embedUrl, s.type);
     });
     streamSources.appendChild(sBtn);
   });
 
   // Play first stream
-  loadVideoStream(streamData.streams[0].url);
+  loadVideoStream(streamData.streams[0].url || streamData.streams[0].embedUrl, streamData.streams[0].type);
 }
 
 // Moviebox Modal Setup
 async function setupMovieboxModal(item) {
   modalActions.innerHTML = `
-    <button class="btn-primary" id="movieboxWatchBtn">▶ Stream Movie / Series</button>
+    <button class="btn-primary" id="movieboxWatchBtn">Stream Movie / Series</button>
   `;
 
   document.getElementById("movieboxWatchBtn").onclick = async () => {
     modalPlayerContainer.style.display = "block";
     streamSources.innerHTML = '<span style="font-size:0.8rem; color:#94a3b8;">Connecting to MovieBox source...</span>';
-    
-    // Fetch detail if needed for slug
-    const slug = item.slug;
-    if (slug) {
-      const detailRes = await fetchJson(`/api/moviebox/detail?slug=${encodeURIComponent(slug)}`);
-      if (detailRes && detailRes.detail) {
-        modalOverview.textContent = detailRes.detail.description || modalOverview.textContent;
-      }
+
+    const detailRes = item.slug
+      ? await fetchJson(`/api/moviebox/detail?slug=${encodeURIComponent(item.slug)}`)
+      : null;
+    const detail = detailRes?.detail || {};
+    const subjectId = detail.id || detail.subjectId || item.id || item.subject_id;
+    const path = detail.slug || detail.path || item.slug || item.detail_path;
+    if (detail.description) modalOverview.textContent = detail.description;
+
+    if (!subjectId || !path) {
+      streamSources.innerHTML = '<span style="font-size:0.8rem; color:#f87171;">MovieBox playback details are unavailable for this title.</span>';
+      return;
     }
 
-    streamSources.innerHTML = `
-      <span style="font-size:0.8rem; color:#34d399;">✓ Powered by Moviebox API backend</span>
+    const seasons = detail.seasons || [];
+    const isSeries = detail.type === "series" || detail.isMovie === false || item.type === "series";
+    if (!isSeries) {
+      await playMovieboxStream(subjectId, path, 0, 0);
+      return;
+    }
+
+    if (!seasons.length) {
+      streamSources.innerHTML = '<span style="font-size:0.8rem; color:#f87171;">No seasons are available for this series.</span>';
+      return;
+    }
+
+    modalActions.innerHTML = `
+      <label for="movieboxSeasonSelect">Season</label>
+      <select id="movieboxSeasonSelect"></select>
+      <label for="movieboxEpisodeSelect">Episode</label>
+      <select id="movieboxEpisodeSelect"></select>
+      <button class="btn-primary" id="movieboxPlayEpisodeBtn">Play Episode</button>
     `;
+    const seasonSelect = document.getElementById("movieboxSeasonSelect");
+    const episodeSelect = document.getElementById("movieboxEpisodeSelect");
+
+    seasons.forEach((season, index) => {
+      const option = document.createElement("option");
+      option.value = String(season.se ?? season.season ?? index + 1);
+      option.textContent = `Season ${option.value}`;
+      seasonSelect.appendChild(option);
+    });
+
+    const updateEpisodes = () => {
+      const season = seasons.find((entry, index) => String(entry.se ?? entry.season ?? index + 1) === seasonSelect.value);
+      const count = Number(season?.maxEp ?? season?.episode_count ?? 0);
+      episodeSelect.innerHTML = "";
+      for (let number = 1; number <= count; number++) {
+        const option = document.createElement("option");
+        option.value = String(number);
+        option.textContent = `Episode ${number}`;
+        episodeSelect.appendChild(option);
+      }
+    };
+    seasonSelect.addEventListener("change", updateEpisodes);
+    updateEpisodes();
+    document.getElementById("movieboxPlayEpisodeBtn").addEventListener("click", () => {
+      playMovieboxStream(subjectId, path, Number(seasonSelect.value), Number(episodeSelect.value));
+    });
   };
+}
+
+async function playMovieboxStream(subjectId, path, season, episode) {
+  streamSources.innerHTML = '<span style="font-size:0.8rem; color:#94a3b8;">Resolving MovieBox stream...</span>';
+  const params = new URLSearchParams({
+    subjectId: String(subjectId),
+    path: String(path),
+    se: String(season),
+    ep: String(episode)
+  });
+  const data = await fetchJson(`/api/moviebox/stream?${params.toString()}`);
+  const sources = data?.sources || data?.streams || [];
+  if (!sources.length) {
+    streamSources.innerHTML = '<span style="font-size:0.8rem; color:#f87171;">No playable MovieBox sources were returned.</span>';
+    return;
+  }
+
+  streamSources.innerHTML = '<span style="font-size:0.8rem; color:#cbd5e1; margin-right:6px;">Quality:</span>';
+  sources.forEach((source, index) => {
+    const sourceUrl = source.url || source.direct;
+    if (!sourceUrl) return;
+    const button = document.createElement("button");
+    button.className = `source-btn ${index === 0 ? "active" : ""}`;
+    button.textContent = source.quality || `${source.resolution || "Auto"}p ${source.format || ""}`.trim();
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".source-btn").forEach(existing => existing.classList.remove("active"));
+      button.classList.add("active");
+      loadVideoStream(sourceUrl, source.format);
+    });
+    streamSources.appendChild(button);
+  });
+
+  const firstSource = sources.find(source => source.url || source.direct);
+  if (firstSource) loadVideoStream(firstSource.url || firstSource.direct, firstSource.format);
 }
 
 // Manga Modal Setup
@@ -584,7 +665,7 @@ function setupMangaModal(item) {
 // -------------------------------------------------------------
 // Video Player Controller (HLS & Native)
 // -------------------------------------------------------------
-function loadVideoStream(url) {
+function loadVideoStream(url, type = "") {
   if (!url) return;
 
   // If the URL is relative (starts with '/' but not '//'), prepend the API base.
@@ -592,18 +673,44 @@ function loadVideoStream(url) {
     url = `${API_BASE}${url}`;
   }
 
-  // Ensure the video element does not send a Referer header (bypass CDN block).
-  if (videoPlayer) {
-    videoPlayer.setAttribute('referrerpolicy', 'no-referrer');
+  if (videoFrame) {
+    videoFrame.remove();
+    videoFrame = null;
   }
+  videoPlayer.style.display = "block";
 
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
   }
+  videoPlayer.pause();
+  videoPlayer.removeAttribute("src");
+  videoPlayer.load();
 
-  if (url.includes('.m3u8')) {
-    if (Hls.isSupported()) {
+  if (String(type).toLowerCase() === "embed" || String(type).toLowerCase() === "iframe") {
+    videoFrame = document.createElement("iframe");
+    videoFrame.className = "video-frame";
+    videoFrame.src = url;
+    videoFrame.title = "Anime episode player";
+    videoFrame.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+    videoFrame.allowFullscreen = true;
+    videoFrame.referrerPolicy = "origin";
+    videoPlayer.parentElement.appendChild(videoFrame);
+    videoPlayer.style.display = "none";
+    return;
+  }
+
+  let mediaUrl = url;
+  try {
+    const parsedUrl = new URL(url, API_BASE);
+    mediaUrl = parsedUrl.searchParams.get("url") || parsedUrl.searchParams.get("u") || url;
+  } catch (error) {
+    // Use the original URL when a provider returns a non-standard stream URL.
+  }
+  const isHls = String(type).toLowerCase().includes("hls") || /\.m3u8(?:$|[?#])/i.test(mediaUrl);
+
+  if (isHls) {
+    if (typeof Hls !== "undefined" && Hls.isSupported()) {
       hlsInstance = new Hls({ enableWorker: true });
       hlsInstance.loadSource(url);
       hlsInstance.attachMedia(videoPlayer);
@@ -611,11 +718,14 @@ function loadVideoStream(url) {
       hlsInstance.on(Hls.Events.ERROR, (event, data) => {
         if (data.fatal) {
           console.warn("HLS fatal error:", data.type);
+          streamSources.insertAdjacentHTML("beforeend", '<span style="font-size:0.8rem; color:#f87171;"> This stream failed. Try another source.</span>');
         }
       });
     } else if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
       videoPlayer.src = url;
       videoPlayer.play().catch(() => {});
+    } else {
+      streamSources.insertAdjacentHTML("beforeend", '<span style="font-size:0.8rem; color:#f87171;"> HLS playback is not supported in this browser.</span>');
     }
   } else {
     videoPlayer.src = url;
@@ -628,6 +738,11 @@ function stopPlayer() {
     hlsInstance.destroy();
     hlsInstance = null;
   }
+  if (videoFrame) {
+    videoFrame.remove();
+    videoFrame = null;
+  }
+  videoPlayer.style.display = "block";
   videoPlayer.pause();
   videoPlayer.removeAttribute("src");
   videoPlayer.load();
