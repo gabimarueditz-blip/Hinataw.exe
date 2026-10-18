@@ -592,6 +592,11 @@ function loadVideoStream(url) {
     url = `${API_BASE}${url}`;
   }
 
+  // Ensure the video element does not send a Referer header (bypass CDN block).
+  if (videoPlayer) {
+    videoPlayer.setAttribute('referrerpolicy', 'no-referrer');
+  }
+
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
